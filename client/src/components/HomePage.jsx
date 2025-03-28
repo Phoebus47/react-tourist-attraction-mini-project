@@ -1,5 +1,5 @@
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { SlLink } from "react-icons/sl";
 import { IconContext } from "react-icons";
 
@@ -7,30 +7,51 @@ const HomePage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [trips, setTrips] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const latestRequest = useRef(null);
 
-  // ดึงข้อมูลจาก API พร้อม Debounce 500ms
   useEffect(() => {
-    const delaySearch = setTimeout(() => {
-      const getTrips = async () => {
-        try {
-          const response = await axios.get(
-            `http://localhost:4001/trips?keywords=${searchTerm}`
-          );
+    setIsLoading(true);
+    const controller = new AbortController();
+    latestRequest.current = controller;
+
+    const delaySearch = setTimeout(async () => {
+      try {
+        const response = await axios.get(
+          `http://localhost:4001/trips?keywords=${searchTerm}`,
+          { signal: controller.signal }
+        );
+        if (latestRequest.current === controller) {
           setTrips(response.data.data || []);
-        } catch (error) {
+        }
+      } catch (error) {
+        if (!axios.isCancel(error)) {
           console.error("Error fetching trips:", error);
-        } finally {
+        }
+      } finally {
+        if (latestRequest.current === controller) {
           setIsLoading(false);
         }
-      };
-      getTrips();
+      }
     }, 500);
 
-    return () => clearTimeout(delaySearch);
+    return () => {
+      clearTimeout(delaySearch);
+      controller.abort(); // ยกเลิก request ก่อนหน้า
+    };
   }, [searchTerm]);
 
-  const handleChange = (e) => {
+  const handleChange = useCallback((e) => {
     setSearchTerm(e.target.value);
+  }, []);
+
+  const handleCopyClick = (url) => {
+    navigator.clipboard.writeText(url)
+      .then(() => {
+        alert('ลิงก์ถูกคัดลอกแล้ว!');
+      })
+      .catch((err) => {
+        console.error('เกิดข้อผิดพลาดในการคัดลอก:', err);
+      });
   };
 
   return (
@@ -85,22 +106,40 @@ const HomePage = () => {
                   </a>
                   <div className="text-gray-500 text-xs flex gap-2 flex-wrap">
                     <p>หมวด</p>
-                    {trip.tags.map((tag, index) => (
-                      <span key={tag}>
-                        {index > 0 && index === trip.tags.length - 1 && "และ "}
+                    {trip.tags
+                      .map((tag) => (
                         <button
-                          onClick={() => setSearchTerm(tag)}
+                          key={tag}
+                          onClick={() => {
+                            if (!searchTerm.includes(tag)) {
+                              setSearchTerm((prev) =>
+                                prev ? `${prev} ${tag}` : tag
+                              );
+                            } else {
+                              setSearchTerm((prev) =>
+                                prev
+                                  .split(" ")
+                                  .filter((t) => t !== tag)
+                                  .join(" ")
+                              );
+                            }
+                          }}
                           className="underline hover:text-gray-600"
                         >
                           {tag}
                         </button>
-                        {index < trip.tags.length - 2 && " "}
-                      </span>
-                    ))}
+                      ))
+                      .reduce(
+                        (acc, curr, index, arr) =>
+                          index === arr.length - 1
+                            ? [...acc, " และ ", curr]
+                            : [...acc, curr, " "],
+                        []
+                      )}
                   </div>
-                  <div className="flex justify-between items-end max-w-xl">
+                  <div className="flex justify-between items-end w-full">
                     <div className="flex gap-2 mt-3 flex-wrap">
-                      {trip.photos.slice(1, 4).map((photo, index) => (
+                      {trip.photos?.slice(1, 4).map((photo, index) => (
                         <img
                           key={index}
                           src={photo || "https://via.placeholder.com/100"}
@@ -109,19 +148,17 @@ const HomePage = () => {
                         />
                       ))}
                     </div>
-                    <a
-                      href={trip.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <div className="flex justify-center items-center border-3 border-sky-500 rounded-full w-[4em] h-[4em] mr-10">
-                        <IconContext.Provider
-                          value={{ color: "#0EA5E9", size: "2.5em" }}
-                        >
+                    <div className="flex justify-center items-center border-3 border-sky-500 rounded-full w-16 h-16">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyClick(trip.url)} // ใช้ trip.url ที่ส่งจาก map
+                        className="hover:cursor-pointer"
+                      >
+                        <IconContext.Provider value={{ color: "#0EA5E9", size: "2.5em" }}>
                           <SlLink />
                         </IconContext.Provider>
-                      </div>
-                    </a>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
