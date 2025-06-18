@@ -9,6 +9,9 @@ const HomePage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const latestRequest = useRef(null);
 
+  // ใช้ environment variable
+  const API_URL = import.meta.env.VITE_API_URL || '/api';
+
   useEffect(() => {
     setIsLoading(true);
     const controller = new AbortController();
@@ -17,7 +20,7 @@ const HomePage = () => {
     const delaySearch = setTimeout(async () => {
       try {
         const response = await axios.get(
-          `http://localhost:4001/trips?keywords=${searchTerm}`,
+          `${API_URL}/trips?keywords=${searchTerm}`,
           { signal: controller.signal }
         );
         if (latestRequest.current === controller) {
@@ -36,9 +39,9 @@ const HomePage = () => {
 
     return () => {
       clearTimeout(delaySearch);
-      controller.abort(); // ยกเลิก request ก่อนหน้า
+      controller.abort();
     };
-  }, [searchTerm]);
+  }, [searchTerm, API_URL]);
 
   const handleChange = useCallback((e) => {
     setSearchTerm(e.target.value);

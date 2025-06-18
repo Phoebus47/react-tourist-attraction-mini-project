@@ -4,16 +4,15 @@ import cors from "cors";
 import trips from "./db.js";
 
 const app = express();
-const port = 4001;
 
 app.use(cors());
 app.use(bodyParser.json());
 
-app.get("/", (req, res) => {
+app.get("/api", (req, res) => {
   res.send("Hello World!");
 });
 
-app.get("/trips", (req, res) => {
+app.get("/api/trips", (req, res) => {
   let keywords = req.query.keywords;
 
   if (keywords === undefined) {
@@ -37,6 +36,5 @@ app.get("/trips", (req, res) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`Server is running at port ${port}`);
-});
+// Export for Vercel
+export default app;
